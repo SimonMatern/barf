@@ -13,7 +13,7 @@ from torchvision.transforms.functional import to_pil_image
 from torchvision import transforms
 
 from models import Homography, NeuralRenderer, SineLayer, Siren
-
+import copy
 
 import cv2 as cv
 
@@ -48,9 +48,10 @@ def draw_patches(img, Hs):
     with torch.no_grad():
         C,H,W = img.size()
         img_numpy = rearrange(img*255,'C H W -> H W C')
-        img_numpy = img_numpy.numpy().astype(np.uint8)
+        img_numpy = img_numpy.cpu().numpy().astype(np.uint8)
 
         for T in Hs:
+            T = copy.deepcopy(T).cpu()
             corners = torch.tensor([[-1.0, -1.0, 1],
                                    [1.0, -1.0, 1],
                                    [1.0, 1.0, 1],
@@ -70,14 +71,14 @@ def draw_patches(img, Hs):
     
 def get_random_Patch(img, h=500, w=500):
     with torch.no_grad():
-
+        img = img.cpu()
         if len(img.size())==3:
             img = img.unsqueeze(0)
 
         # get random homography
         T, weights, corners_H = get_random_Warp()
 
-
+        return get_Patch(img, T, h, w), T
         B,C,H,W = img.size()
         x = create_meshgrid(h,w).squeeze()
         ones = torch.ones((h,w,1))
@@ -90,3 +91,23 @@ def get_random_Patch(img, h=500, w=500):
         y = F.grid_sample(img, x_euc, align_corners=True).squeeze()
     
         return y, T
+    
+
+def get_Patch(img, T, h=500, w=500):
+    with torch.no_grad():
+        img = img.cpu()
+        if len(img.size())==3:
+            img = img.unsqueeze(0)
+    
+        B,C,H,W = img.size()
+        x = create_meshgrid(h,w).squeeze()
+        ones = torch.ones((h,w,1))
+        x = torch.concat([x,ones], dim=2)
+        x = rearrange(x,'H W C -> (H W) C')
+        x_hom = (T(x.T)).T
+        x_euc = x_hom/x_hom[:,2:]    
+        x_euc = x_euc[:,:2] 
+        x_euc = rearrange(x_euc, '(H W) C -> H W C', H=h,W=w).unsqueeze(0) # (1, H, W, 2)
+        y = F.grid_sample(img, x_euc, align_corners=True).squeeze()
+    
+        return y
