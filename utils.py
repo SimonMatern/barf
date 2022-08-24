@@ -29,10 +29,15 @@ def show(imgs):
         
 def get_random_Warp():
     while True:
-        w = torch.rand(8)*0.5
-        w[0] += -0.2
-        w[1] += -0.2
+        w = torch.rand(8)*0.3
 
+        w[0] = torch.rand(1)*2 -1
+        w[1] = torch.rand(1)*2 - 1
+
+        w[5] = torch.rand(1)*0.4+0.3
+        w[4] = -0.5*w[5]
+
+        
         H = Homography(w)
 
         corners = torch.tensor([[-1.0, -1.0, 1],
